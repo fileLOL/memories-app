@@ -2,16 +2,24 @@ import React, { useState } from 'react';
 import HomeScreen from './components/HomeScreen';
 import LevelSelect from './components/LevelSelect';
 import GameScreen from './components/GameScreen';
+import ModeSelect from './components/ModeSelect';
+import QuizGame from './components/QuizGame';
+import TimelineGame from './components/TimelineGame';
+import MatchConceptsGame from './components/MatchConceptsGame';
+import FlashcardsGame from './components/FlashcardsGame';
+import StoryBuilderGame from './components/StoryBuilderGame';
 import { chapters, getStarRating } from './data/levels';
 import './style.css';
 import './styles/cards.css';
 import './styles/game.css';
+import './styles/minigames.css';
 
 function App() {
   const [page, setPage] = useState('home');
   const [mode, setMode] = useState('solo');
   const [currentChapter, setCurrentChapter] = useState(null);
   const [currentLevel, setCurrentLevel] = useState(null);
+  const [miniGameMode, setMiniGameMode] = useState(null);
   const [progress, setProgress] = useState(() => {
     try {
       const saved = localStorage.getItem('memories-progress');
@@ -38,12 +46,13 @@ function App() {
 
   const handleStartGame = (selectedMode, chapterId) => {
     setMode(selectedMode);
+    setMiniGameMode(null);
     if (chapterId) {
       const ch = chapters.find(c => c.id === chapterId);
       if (ch) {
         setCurrentChapter(ch);
         setCurrentLevel(ch.levels[0]);
-        setPage('game');
+        setPage('mode-select');
         return;
       }
     }
@@ -53,7 +62,22 @@ function App() {
   const handleSelectLevel = (chapter, level) => {
     setCurrentChapter(chapter);
     setCurrentLevel(level);
-    setPage('game');
+    setMiniGameMode(null);
+    setPage('mode-select');
+  };
+
+  const handleSelectMode = (modeId) => {
+    setMiniGameMode(modeId);
+    if (modeId === 'memory') {
+      setPage('game');
+    } else {
+      setPage('minigame');
+    }
+  };
+
+  const handleBackToModes = () => {
+    setMiniGameMode(null);
+    setPage('mode-select');
   };
 
   const handleNextLevel = () => {
@@ -61,34 +85,48 @@ function App() {
     const idx = currentChapter.levels.findIndex(l => l.id === currentLevel.id);
     if (idx < currentChapter.levels.length - 1) {
       const nextLevel = currentChapter.levels[idx + 1];
-      saveProgress(currentChapter.id, currentLevel.id, getStarRating(0, currentLevel.pairs, 0, currentLevel.timeLimit));
+      saveProgress(currentChapter.id, currentLevel.id, 0);
       setCurrentLevel(nextLevel);
+      setMiniGameMode(null);
+      setPage('mode-select');
     } else {
       const chIdx = chapters.findIndex(c => c.id === currentChapter.id);
       if (chIdx < chapters.length - 1) {
         const nextCh = chapters[chIdx + 1];
         setCurrentChapter(nextCh);
         setCurrentLevel(nextCh.levels[0]);
+        setMiniGameMode(null);
+        setPage('mode-select');
       } else {
         setPage('level-select');
       }
     }
   };
 
-  const handleNavigate = (p) => setPage(p);
+  const handleNavigate = (p) => { setMiniGameMode(null); setPage(p); };
+
+  const breadcrumbPage = () => {
+    if (page === 'home') return 'INICI';
+    if (page === 'level-select') return 'TRIA NIVELL';
+    if (page === 'mode-select') return 'TRIA MODE';
+    if (page === 'minigame' && miniGameMode) {
+      const modeNames = {
+        quiz: 'QUIZ', timeline: 'LÍNIA DEL TEMPS', match: 'RELACIONAR',
+        flashcards: 'FITXES', story: 'HISTÒRIA',
+      };
+      return `${currentChapter?.name.toUpperCase()} · ${modeNames[miniGameMode] || 'MINIJOC'}`;
+    }
+    if (page === 'game' && currentChapter) return `${currentChapter.name.toUpperCase()} · MEMÒRIES`;
+    if (page === 'collection') return 'COL·LECCIÓ HISTÒRICA';
+    return 'ARXIU';
+  };
 
   return (
     <div className="app">
       <main className="main" style={{ marginLeft: 0 }}>
         <header className="topbar">
           <div className="crumb">
-            MEMORIES <span>/</span>{' '}
-            {({
-              'home': 'INICI',
-              'level-select': 'TRIA NIVELL',
-              'game': currentChapter ? `${currentChapter.name.toUpperCase()} · ${currentLevel?.name || ''}` : 'PARTIDA',
-              'collection': 'COL·LECCIÓ HISTÒRICA'
-            })[page] || 'ARXIU'}
+            MEMORIES <span>/</span>{' '}{breadcrumbPage()}
           </div>
           <div className="top-actions">
             <span className="status-dot" /> <span>ARXIU PERSONAL</span>
@@ -105,6 +143,15 @@ function App() {
             onSelectLevel={handleSelectLevel}
             progress={progress}
             mode={mode}
+          />
+        )}
+
+        {page === 'mode-select' && (
+          <ModeSelect
+            onBack={() => setPage('level-select')}
+            onSelectMode={handleSelectMode}
+            chapter={currentChapter}
+            level={currentLevel}
           />
         )}
 
@@ -126,6 +173,46 @@ function App() {
               saveProgress(currentChapter.id, currentLevel.id, 0);
               setGameKey(k => k + 1);
             }}
+          />
+        )}
+
+        {page === 'minigame' && currentLevel && currentChapter && miniGameMode === 'quiz' && (
+          <QuizGame
+            level={currentLevel}
+            chapter={currentChapter}
+            onBack={handleBackToModes}
+          />
+        )}
+
+        {page === 'minigame' && currentLevel && currentChapter && miniGameMode === 'timeline' && (
+          <TimelineGame
+            level={currentLevel}
+            chapter={currentChapter}
+            onBack={handleBackToModes}
+          />
+        )}
+
+        {page === 'minigame' && currentLevel && currentChapter && miniGameMode === 'match' && (
+          <MatchConceptsGame
+            level={currentLevel}
+            chapter={currentChapter}
+            onBack={handleBackToModes}
+          />
+        )}
+
+        {page === 'minigame' && currentLevel && currentChapter && miniGameMode === 'flashcards' && (
+          <FlashcardsGame
+            level={currentLevel}
+            chapter={currentChapter}
+            onBack={handleBackToModes}
+          />
+        )}
+
+        {page === 'minigame' && currentLevel && currentChapter && miniGameMode === 'story' && (
+          <StoryBuilderGame
+            level={currentLevel}
+            chapter={currentChapter}
+            onBack={handleBackToModes}
           />
         )}
 
